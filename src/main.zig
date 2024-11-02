@@ -19,9 +19,9 @@ pub fn main() error{BadParam}!u8 {
         .bb1
     else if (mem.eql(u8, tm_choice, "bb2"))
         .bb2
-    else if (mem.eql(u8, tm_choice, "bb2"))
+    else if (mem.eql(u8, tm_choice, "bb3"))
         .bb3
-    else if (mem.eql(u8, tm_choice, "bb2"))
+    else if (mem.eql(u8, tm_choice, "bb4"))
         .bb4
     else
         return error.BadParam;

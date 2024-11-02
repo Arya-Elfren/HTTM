@@ -13,6 +13,7 @@
         default = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [
             inputs.zig2nix.outputs.packages.${system}.zig.master.bin
+            poop
           ];
         };
       };
