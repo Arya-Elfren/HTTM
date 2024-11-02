@@ -35,3 +35,12 @@ test "fuzz example" {
     };
     try std.testing.fuzz(global.testOne, .{});
 }
+
+test "init TM" {
+    const TM = @import("TM.zig");
+    const state: TM.State = .{
+        .read_zero = .{ .write = 1, .move = .left },
+        .read_one = .{ .write = 0, .move = .right },
+    };
+    _ = state;
+}
