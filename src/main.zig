@@ -2,7 +2,7 @@ const std = @import("std");
 const mem = std.mem;
 const TM = @import("TM.zig");
 
-pub fn main() error{BadParam}!u8 {
+pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const ally = arena.allocator();
@@ -23,17 +23,23 @@ pub fn main() error{BadParam}!u8 {
         .bb3
     else if (mem.eql(u8, tm_choice, "bb4"))
         .bb4
+    else if (mem.eql(u8, tm_choice, "bb5"))
+        .bb5
+    else if (mem.eql(u8, tm_choice, "bb6"))
+        .bb6
     else
         return error.BadParam;
 
+    const stdout = std.io.getStdOut().writer();
+
     if (mem.eql(u8, eval_choice, "TM")) {
-        const eval: TM = .from(tm);
+        var eval: TM = .from(tm);
         defer eval.deinit(ally);
-        
+
         try eval.eval(ally);
-        const out = try eval.tape.to_array(ally);
+        const out = try eval.to_array(ally);
         defer ally.free(out);
-        
-        std.log.err("{any}", out);
+
+        try stdout.print("{any} in {}", .{out, eval.step});
     } else return error.BadParam;
 }

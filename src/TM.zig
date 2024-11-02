@@ -31,7 +31,7 @@ const Tape = struct {
         .right_tape = .empty,
     };
 
-    fn deinit(self: *@This(), ally: std.mem.Allocator) void {
+    fn deinit(self: *Tape, ally: std.mem.Allocator) void {
         self.left_tape.deinit(ally);
         self.right_tape.deinit(ally);
     }
@@ -71,18 +71,20 @@ const Tape = struct {
 };
 
 states: []const State,
-state: State.Index,
-tape: Tape,
+state: State.Index = @enumFromInt(0),
+tape: Tape = .empty,
+step: usize = 0,
+step_cap: usize = std.math.maxInt(u26),
 
 pub fn from(self: TM) TM {
     return self;
 }
 
-pub fn deinit(self: *@This(), ally: std.mem.Allocator) void {
+pub fn deinit(self: *TM, ally: std.mem.Allocator) void {
     self.tape.deinit(ally);
 }
 
-pub fn get_state(self: *@This()) State {
+pub fn get_state(self: *TM) State {
     return self.states[@intFromEnum(self.state)];
 }
 
@@ -90,9 +92,9 @@ pub fn to_array(self: *TM, ally: Allocator) ![]const u1 {
     return try self.tape.to_array(ally);
 }
 
-pub fn eval(self: *@This(), ally: std.mem.Allocator) !void {
+pub fn eval(self: *TM, ally: std.mem.Allocator) !void {
     try self.tape.write(ally, 0);
-    while (self.state != .halt) {
+    while (self.state != .halt and self.step < self.step_cap) : (self.step += 1) {
         const pstate = switch (self.tape.read()) {
             0 => self.get_state().read_zero,
             1 => self.get_state().read_one,
@@ -103,19 +105,18 @@ pub fn eval(self: *@This(), ally: std.mem.Allocator) !void {
     }
 }
 
-pub const empty: @This() = .{
-    .states = &.{.halt},
-    .state = @enumFromInt(0),
-    .tape = .empty,
-};
+test "TM1" {
+    const ally = std.testing.allocator;
+    try @import("testcases.zig").test_tm(TM, ally);
+}
+
+pub const empty: TM = .{ .states = &.{.halt} };
 
 pub const bb1: TM = .{
     .states = &.{.{
         .read_zero = .{ .move = .right, .write = 1, .next = .halt },
         .read_one = .{ .move = .left, .write = 0, .next = @enumFromInt(0) },
     }},
-    .state = @enumFromInt(0),
-    .tape = .empty,
 };
 
 /// Two-state busy-beaver champion
@@ -127,8 +128,6 @@ pub const bb2: TM = .{
         .read_zero = .{ .move = .left, .write = 1, .next = @enumFromInt(0) },
         .read_one = .{ .move = .right, .write = 1, .next = .halt },
     } },
-    .state = @enumFromInt(0),
-    .tape = .empty,
 };
 
 /// Three-state busy beaver champion
@@ -147,8 +146,6 @@ pub const bb3: TM = .{
             .read_one = .{ .move = .left, .write = 1, .next = @enumFromInt(0) },
         },
     },
-    .state = @enumFromInt(0),
-    .tape = .empty,
 };
 
 pub const bb4: TM = .{
@@ -165,11 +162,46 @@ pub const bb4: TM = .{
         .read_zero = .{ .move = .right, .write = 1, .next = @enumFromInt(3) },
         .read_one = .{ .move = .right, .write = 0, .next = @enumFromInt(0) },
     } },
-    .tape = .empty,
-    .state = @enumFromInt(0),
 };
 
-test "TM1" {
-    const ally = std.testing.allocator;
-    try @import("testcases.zig").test_tm(TM, ally);
-}
+pub const bb5: TM = .{
+    .states = &.{ .{
+        .read_zero = .{ .move = .right, .write = 1, .next = @enumFromInt(1) },
+        .read_one = .{ .move = .left, .write = 1, .next = @enumFromInt(2) },
+    }, .{
+        .read_zero = .{ .move = .right, .write = 1, .next = @enumFromInt(2) },
+        .read_one = .{ .move = .right, .write = 1, .next = @enumFromInt(1) },
+    }, .{
+        .read_zero = .{ .move = .right, .write = 1, .next = @enumFromInt(3) },
+        .read_one = .{ .move = .left, .write = 0, .next = @enumFromInt(4) },
+    }, .{
+        .read_zero = .{ .move = .left, .write = 1, .next = @enumFromInt(0) },
+        .read_one = .{ .move = .left, .write = 1, .next = @enumFromInt(3) },
+    }, .{
+        .read_zero = .{ .move = .right, .write = 1, .next = .halt },
+        .read_one = .{ .move = .left, .write = 0, .next = @enumFromInt(0) },
+    }, },
+};
+
+pub const bb6: TM = .{
+    .states = &.{ .{
+        .read_zero = .{ .move = .right, .write = 1, .next = @enumFromInt(1) },
+        .read_one = .{ .move = .left, .write = 0, .next = @enumFromInt(3) },
+    }, .{
+        .read_zero = .{ .move = .right, .write = 1, .next = @enumFromInt(2) },
+        .read_one = .{ .move = .right, .write = 0, .next = @enumFromInt(5) },
+    }, .{
+        .read_zero = .{ .move = .left, .write = 1, .next = @enumFromInt(2) },
+        .read_one = .{ .move = .left, .write = 1, .next = @enumFromInt(0) },
+    }, .{
+        .read_zero = .{ .move = .left, .write = 0, .next = @enumFromInt(4) },
+        .read_one = .{ .move = .right, .write = 1, .next = .halt },
+    }, .{
+        .read_zero = .{ .move = .left, .write = 1, .next = @enumFromInt(5) },
+        .read_one = .{ .move = .right, .write = 0, .next = @enumFromInt(1) },
+    }, .{
+        .read_zero = .{ .move = .right, .write = 0, .next = @enumFromInt(2) },
+        .read_one = .{ .move = .right, .write = 0, .next = @enumFromInt(4) },
+    }, },
+};
+
