@@ -38,17 +38,6 @@ test "fuzz example" {
 
 test "init TM" {
     const TM = @import("TM.zig");
-    const state: TM.State = .{
-        .read_zero = .{
-            .write = 1,
-            .move = .left,
-            .next = null,
-        },
-        .read_one = .{
-            .write = 0,
-            .move = .right,
-            .next = null,
-        },
-    };
-    _ = state;
+    const empty: TM = .empty;
+    _ = empty;
 }

@@ -1,8 +1,10 @@
+const std = @import("std");
+
 pub const State = struct {
     pub const PartialState = struct {
         write: u1,
         move: enum(u1) { left, right },
-        next: ?*const State,
+        next: enum(usize) { halt = std.math.maxInt(usize), _ },
     };
 
     read_zero: PartialState,
@@ -10,3 +12,6 @@ pub const State = struct {
 };
 
 states: []State,
+inital_state: usize,
+
+pub const empty: @This() = .{ .states = &.{}, .inital_state = 0 };
