@@ -1,4 +1,8 @@
 const std = @import("std");
+const assert = std.debug.assert;
+const Allocator = std.mem.Allocator;
+
+const TM = @This();
 
 pub const State = struct {
     pub const Index = enum(usize) { halt = std.math.maxInt(usize), _ };
@@ -43,7 +47,7 @@ const Tape = struct {
     fn get_tape_and_offset(self: *Tape) struct { *std.ArrayListUnmanaged(u1), usize } {
         return if (self.index < 0) .{
             &self.left_tape,
-            @intCast(-self.index - 1),
+            @intCast(@abs(self.index + 1)),
         } else .{
             &self.right_tape,
             @intCast(self.index),
@@ -55,6 +59,7 @@ const Tape = struct {
         if (tape_offset < tape_array.items.len) {
             tape_array.items[tape_offset] = bit;
         } else {
+            assert(tape_offset == tape_array.items.len);
             try tape_array.append(ally, bit);
         }
     }
@@ -69,6 +74,10 @@ states: []const State,
 state: State.Index,
 tape: Tape,
 
+pub fn from(self: TM) TM {
+    return self;
+}
+
 pub fn deinit(self: *@This(), ally: std.mem.Allocator) void {
     self.tape.deinit(ally);
 }
@@ -77,13 +86,19 @@ pub fn get_state(self: *@This()) State {
     return self.states[@intFromEnum(self.state)];
 }
 
+pub fn to_array(self: *TM, ally: Allocator) ![]const u1 {
+    return try self.tape.to_array(ally);
+}
+
 pub fn eval(self: *@This(), ally: std.mem.Allocator) !void {
+    try self.tape.write(ally, 0);
     while (self.state != .halt) {
         const pstate = switch (self.tape.read()) {
             0 => self.get_state().read_zero,
             1 => self.get_state().read_one,
         };
         try self.tape.write(ally, pstate.write);
+        self.tape.index += @intFromEnum(pstate.move);
         self.state = pstate.next;
     }
 }
@@ -94,14 +109,67 @@ pub const empty: @This() = .{
     .tape = .empty,
 };
 
-test "trivial TM exec" {
+pub const bb1: TM = .{
+    .states = &.{.{
+        .read_zero = .{ .move = .right, .write = 1, .next = .halt },
+        .read_one = .{ .move = .left, .write = 0, .next = @enumFromInt(0) },
+    }},
+    .state = @enumFromInt(0),
+    .tape = .empty,
+};
+
+/// Two-state busy-beaver champion
+pub const bb2: TM = .{
+    .states = &.{ .{
+        .read_zero = .{ .move = .right, .write = 1, .next = @enumFromInt(1) },
+        .read_one = .{ .move = .left, .write = 1, .next = @enumFromInt(1) },
+    }, .{
+        .read_zero = .{ .move = .left, .write = 1, .next = @enumFromInt(0) },
+        .read_one = .{ .move = .right, .write = 1, .next = .halt },
+    } },
+    .state = @enumFromInt(0),
+    .tape = .empty,
+};
+
+/// Three-state busy beaver champion
+pub const bb3: TM = .{
+    .states = &.{
+        .{
+            .read_zero = .{ .move = .right, .write = 1, .next = @enumFromInt(1) },
+            .read_one = .{ .move = .right, .write = 1, .next = .halt },
+        },
+        .{
+            .read_zero = .{ .move = .right, .write = 0, .next = @enumFromInt(2) },
+            .read_one = .{ .move = .right, .write = 1, .next = @enumFromInt(1) },
+        },
+        .{
+            .read_zero = .{ .move = .left, .write = 1, .next = @enumFromInt(2) },
+            .read_one = .{ .move = .left, .write = 1, .next = @enumFromInt(0) },
+        },
+    },
+    .state = @enumFromInt(0),
+    .tape = .empty,
+};
+
+pub const bb4: TM = .{
+    .states = &.{ .{
+        .read_zero = .{ .move = .right, .write = 1, .next = @enumFromInt(1) },
+        .read_one = .{ .move = .left, .write = 1, .next = @enumFromInt(1) },
+    }, .{
+        .read_zero = .{ .move = .left, .write = 1, .next = @enumFromInt(0) },
+        .read_one = .{ .move = .left, .write = 0, .next = @enumFromInt(2) },
+    }, .{
+        .read_zero = .{ .move = .right, .write = 1, .next = .halt },
+        .read_one = .{ .move = .left, .write = 1, .next = @enumFromInt(3) },
+    }, .{
+        .read_zero = .{ .move = .right, .write = 1, .next = @enumFromInt(3) },
+        .read_one = .{ .move = .right, .write = 0, .next = @enumFromInt(0) },
+    } },
+    .tape = .empty,
+    .state = @enumFromInt(0),
+};
+
+test "TM1" {
     const ally = std.testing.allocator;
-    var triv: @This() = .empty;
-    defer triv.deinit(ally);
-
-    try triv.eval(ally);
-    const out = try triv.tape.to_array(ally);
-    defer ally.free(out);
-
-    try std.testing.expectEqualSlices(u1, &.{0}, out);
+    try @import("testcases.zig").test_tm(TM, ally);
 }
