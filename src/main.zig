@@ -1,6 +1,11 @@
 const std = @import("std");
 const mem = std.mem;
 const TM = @import("TM.zig");
+const tape = @import("tape.zig");
+
+test "all" {
+    std.testing.refAllDeclsRecursive(tape);
+}
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
