@@ -3,11 +3,39 @@ const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 
 const TM = @This();
+const alphabet = blk: {
+    var tmp: [26]u8 = undefined;
+    for ('A'..'Z' + 1, 0..) |char, i| tmp[i] = char;
+    break :blk tmp;
+};
+
+pub const Direction = enum(i2) {
+    left = -1,
+    right = 1,
+    pub fn label(self: Direction) u8 {
+        return switch (self) {
+            .left => 'L',
+            .right => 'R',
+        };
+    }
+};
 
 pub const State = struct {
-    pub const Index = enum(usize) { halt = std.math.maxInt(usize), _ };
+    pub const Index = enum(usize) {
+        halt = std.math.maxInt(usize),
+        _,
+        pub fn to_int(self: Index) usize {
+            return @intFromEnum(self);
+        }
+        pub fn label(self: Index) u8 {
+            return if (self.to_int() < 26) alphabet[self.to_int()] else 'H';
+        }
+        pub fn from(idx: TM.State.Index) Index {
+            return @enumFromInt(@intFromEnum(idx));
+        }
+    };
     pub const PartialState = struct {
-        move: enum(i2) { left = -1, right = 1 },
+        move: Direction,
         write: u1,
         next: Index,
 
@@ -17,7 +45,7 @@ pub const State = struct {
     read_zero: PartialState,
     read_one: PartialState,
 
-    const halt: State = .{ .read_zero = .halt, .read_one = .halt };
+    pub const halt: State = .{ .read_zero = .halt, .read_one = .halt };
 };
 
 const Tape = struct {
@@ -70,11 +98,43 @@ const Tape = struct {
     }
 };
 
+pub const DiskWriter = struct {
+    writer: std.fs.File.Writer,
+
+    pub fn write_log(
+        self: DiskWriter,
+        current_state: State.Index,
+        next_state: State.Index,
+        bit: u1,
+        direction: Direction,
+    ) !void {
+        try self.writer.print(
+            "{c} -> {c}, {} ({c})\n",
+            .{
+                current_state.label(),
+                next_state.label(),
+                bit,
+                direction.label(),
+            },
+        );
+    }
+};
+
+const DiskWritingTM = struct {
+    pub fn from(machine: TM) TM {
+        return machine.with_writer(std.fs.cwd().createFile(
+            "execution-trace",
+            .{},
+        ) catch unreachable);
+    }
+};
+
 states: []const State,
 state: State.Index = @enumFromInt(0),
 tape: Tape = .empty,
 step: usize = 0,
 step_cap: usize = std.math.maxInt(u26),
+disk_writer: ?DiskWriter = null,
 
 pub fn from(self: TM) TM {
     return self;
@@ -92,6 +152,17 @@ pub fn to_array(self: *TM, ally: Allocator) ![]const u1 {
     return try self.tape.to_array(ally);
 }
 
+pub fn with_writer(self: TM, file: std.fs.File) TM {
+    return .{
+        .states = self.states,
+        .state = self.state,
+        .tape = self.tape,
+        .step = self.step,
+        .step_cap = self.step_cap,
+        .disk_writer = .{ .writer = file.writer() },
+    };
+}
+
 pub fn eval(self: *TM, ally: std.mem.Allocator) !void {
     try self.tape.write(ally, 0);
     while (self.state != .halt and self.step < self.step_cap) : (self.step += 1) {
@@ -100,6 +171,14 @@ pub fn eval(self: *TM, ally: std.mem.Allocator) !void {
             1 => self.get_state().read_one,
         };
         try self.tape.write(ally, pstate.write);
+        if (self.disk_writer) |disk_writer| {
+            try disk_writer.write_log(
+                self.state,
+                pstate.next,
+                pstate.write,
+                pstate.move,
+            );
+        } else {}
         self.tape.index += @intFromEnum(pstate.move);
         self.state = pstate.next;
     }
@@ -108,6 +187,7 @@ pub fn eval(self: *TM, ally: std.mem.Allocator) !void {
 test "TM1" {
     const ally = std.testing.allocator;
     try @import("testcases.zig").test_tm(TM, ally);
+    try @import("testcases.zig").test_tm(TM.DiskWritingTM, ally);
 }
 
 pub const empty: TM = .{ .states = &.{.halt} };

@@ -2,6 +2,7 @@ const std = @import("std");
 const TM = @import("TM.zig");
 
 const TestCase = struct { machine: TM, expected_out: []const u1 };
+
 const test_cases = [_]TestCase{
     // Trivial Turing Machine that immediately halts
     .{ .machine = .empty, .expected_out = &.{0} },
