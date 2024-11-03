@@ -14,37 +14,37 @@ pub fn Tape(comptime Child: type, comptime chunk_size: usize) type {
         const IndexInt = std.math.IntFittingRange(0, chunk_size - 1);
         const Index = enum(IndexInt) {
             _,
-            
+
             const first: Index = @enumFromInt(0);
             const last: Index = @enumFromInt(std.math.maxInt(IndexInt));
-            
+
             pub fn incr(idx: *Index) void {
                 assert(idx.* != Index.last);
                 idx.* = @enumFromInt(@intFromEnum(idx.*) + 1);
             }
-            
+
             pub fn decr(idx: *Index) void {
                 assert(idx.* != Index.first);
                 idx.* = @enumFromInt(@intFromEnum(idx.*) - 1);
             }
-            
+
             pub fn move(idx: *Index, direction: Direction) void {
                 assert(idx.* != Index.first);
                 assert(idx.* != Index.last);
                 idx.* = @enumFromInt(@intFromEnum(idx.*) + @intFromEnum(direction));
             }
         };
-        
+
         list: List,
         current: *Node,
         index: Index,
-        
+
         fn createNode(ally: mem.Allocator) !*Node {
             const node = try ally.create(Node);
             @memset(node.data[0..], 0);
             return node;
         }
-        
+
         pub fn init(ally: mem.Allocator) !Self {
             const node = try createNode(ally);
             var list: List = .{};
@@ -55,11 +55,11 @@ pub fn Tape(comptime Child: type, comptime chunk_size: usize) type {
                 .index = @enumFromInt(@as(u2, @intFromEnum(Index.last)) / 2),
             };
         }
-        
+
         pub fn deinit(tape: *Self, ally: mem.Allocator) void {
             while (tape.list.pop()) |node| ally.destroy(node);
         }
-        
+
         fn appendAndMove(tape: *Self, ally: mem.Allocator) !void {
             const node = try createNode(ally);
             tape.list.append(node);
@@ -73,7 +73,7 @@ pub fn Tape(comptime Child: type, comptime chunk_size: usize) type {
             tape.current = node;
             tape.index = .last;
         }
-        
+
         pub fn step(tape: *Self, ally: mem.Allocator, write: Child, move: Direction) !void {
             switch (move) {
                 .left => switch (tape.index) {
@@ -108,7 +108,7 @@ pub fn Tape(comptime Child: type, comptime chunk_size: usize) type {
                 },
             }
         }
-        
+
         pub fn read(tape: *const Self) Child {
             return tape.current.data[@intFromEnum(tape.index)];
         }
@@ -117,7 +117,11 @@ pub fn Tape(comptime Child: type, comptime chunk_size: usize) type {
 
 test Tape {
     const ally = testing.allocator;
-    inline for ([_]type{ Tape(u1, 2), Tape(u1, 1), Tape(u8, 1) }) |T| {
+    inline for ([_]type{
+        Tape(u1, 2),
+        Tape(u1, 1),
+        Tape(u8, 1),
+    }) |T| {
         var tape: T = try .init(ally);
         defer tape.deinit(ally);
 
@@ -130,4 +134,3 @@ test Tape {
         try testing.expect(tape.read() == 1);
     }
 }
-

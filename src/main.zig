@@ -2,9 +2,12 @@ const std = @import("std");
 const mem = std.mem;
 const TM = @import("TM.zig");
 const tape = @import("tape.zig");
+const DiskWritingTM = @import("DiskWritingTM.zig");
 
 test "all" {
     std.testing.refAllDeclsRecursive(tape);
+    std.testing.refAllDeclsRecursive(DiskWritingTM);
+    std.testing.refAllDeclsRecursive(TM);
 }
 
 pub fn main() !void {
@@ -45,6 +48,6 @@ pub fn main() !void {
         const out = try eval.to_array(ally);
         defer ally.free(out);
 
-        try stdout.print("{any} in {}", .{out, eval.step});
+        try stdout.print("{any} in {}", .{ out, eval.step });
     } else return error.BadParam;
 }
